@@ -62,6 +62,12 @@ URL_CLIENTSCOPES = "{url}/admin/realms/{realm}/client-scopes"
 URL_CLIENTSCOPE = "{url}/admin/realms/{realm}/client-scopes/{id}"
 URL_CLIENTSCOPE_PROTOCOLMAPPERS = "{url}/admin/realms/{realm}/client-scopes/{id}/protocol-mappers/models"
 URL_CLIENTSCOPE_PROTOCOLMAPPER = "{url}/admin/realms/{realm}/client-scopes/{id}/protocol-mappers/models/{mapper_id}"
+URL_CLIENTSCOPE_SCOPEMAPPINGS_CLIENT = "{url}/admin/realms/{realm}/client-scopes/{id}/scope-mappings/clients/{client_id}"
+URL_CLIENTSCOPE_SCOPEMAPPINGS_CLIENT_AVAILABLE = "{url}/admin/realms/{realm}/client-scopes/{id}/scope-mappings/clients/{client_id}/available"
+URL_CLIENTSCOPE_SCOPEMAPPINGS_CLIENT_COMPOSITE = "{url}/admin/realms/{realm}/client-scopes/{id}/scope-mappings/clients/{client_id}/composite"
+URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM = "{url}/admin/realms/{realm}/client-scopes/{id}/scope-mappings/realm"
+URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM_AVAILABLE = "{url}/admin/realms/{realm}/client-scopes/{id}/scope-mappings/realm/available"
+URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM_COMPOSITE = "{url}/admin/realms/{realm}/client-scopes/{id}/scope-mappings/realm/composite"
 
 URL_CLIENT_ROLEMAPPINGS = "{url}/admin/realms/{realm}/groups/{id}/role-mappings/clients/{client}"
 URL_CLIENT_ROLEMAPPINGS_AVAILABLE = "{url}/admin/realms/{realm}/groups/{id}/role-mappings/clients/{client}/available"
@@ -224,6 +230,7 @@ class KeycloakAPI(object):
     """ Keycloak API access; Keycloak uses OAuth 2.0 to protect its API, an access token for which
         is obtained through OpenID connect
     """
+
     def __init__(self, module, connection_header):
         self.module = module
         self.baseurl = self.module.params.get('auth_keycloak_url')
@@ -249,8 +256,9 @@ class KeycloakAPI(object):
                 self.module.fail_json(msg='Could not obtain realm %s: %s' % (realm, str(e)),
                                       exception=traceback.format_exc())
         except ValueError as e:
-            self.module.fail_json(msg='API returned incorrect JSON when trying to obtain realm %s: %s' % (realm, str(e)),
-                                  exception=traceback.format_exc())
+            self.module.fail_json(
+                msg='API returned incorrect JSON when trying to obtain realm %s: %s' % (realm, str(e)),
+                exception=traceback.format_exc())
         except Exception as e:
             self.module.fail_json(msg='Could not obtain realm %s: %s' % (realm, str(e)),
                                   exception=traceback.format_exc())
@@ -314,8 +322,9 @@ class KeycloakAPI(object):
             return json.loads(to_native(open_url(clientlist_url, method='GET', headers=self.restheaders,
                                                  validate_certs=self.validate_certs).read()))
         except ValueError as e:
-            self.module.fail_json(msg='API returned incorrect JSON when trying to obtain list of clients for realm %s: %s'
-                                      % (realm, str(e)))
+            self.module.fail_json(
+                msg='API returned incorrect JSON when trying to obtain list of clients for realm %s: %s'
+                    % (realm, str(e)))
         except Exception as e:
             self.module.fail_json(msg='Could not obtain list of clients for realm %s: %s'
                                       % (realm, str(e)))
@@ -433,6 +442,20 @@ class KeycloakAPI(object):
             self.module.fail_json(msg="Could not fetch rolemappings for client %s in realm %s: %s"
                                       % (cid, realm, str(e)))
 
+    def get_client_role_by_id(self, cid, role_id, realm="master"):
+        """ Fetch the roles of the a client on the Keycloak server.
+
+        :param cid: ID of the client from which to obtain the rolemappings.
+        :param role_id: ID of the client role
+        :param realm: Realm from which to obtain the rolemappings.
+        :return: The rollemappings of specified group and client of the realm (default "master").
+        """
+        roles = self.get_client_roles_by_id(cid, realm=realm)
+        for role in roles:
+            if role_id == role['id']:
+                return role
+        return None
+
     def get_client_role_by_name(self, gid, cid, name, realm="master"):
         """ Get the role ID of a client.
 
@@ -477,7 +500,8 @@ class KeycloakAPI(object):
         :param realm: Realm from which to obtain the rolemappings.
         :return: The rollemappings of specified group and client of the realm (default "master").
         """
-        available_rolemappings_url = URL_CLIENT_ROLEMAPPINGS_AVAILABLE.format(url=self.baseurl, realm=realm, id=gid, client=cid)
+        available_rolemappings_url = URL_CLIENT_ROLEMAPPINGS_AVAILABLE.format(url=self.baseurl, realm=realm, id=gid,
+                                                                              client=cid)
         try:
             return json.loads(to_native(open_url(available_rolemappings_url, method="GET", headers=self.restheaders,
                                                  validate_certs=self.validate_certs).read()))
@@ -493,7 +517,8 @@ class KeycloakAPI(object):
         :param realm: Realm from which to obtain the rolemappings.
         :return: The rollemappings of specified group and client of the realm (default "master").
         """
-        available_rolemappings_url = URL_CLIENT_ROLEMAPPINGS_COMPOSITE.format(url=self.baseurl, realm=realm, id=gid, client=cid)
+        available_rolemappings_url = URL_CLIENT_ROLEMAPPINGS_COMPOSITE.format(url=self.baseurl, realm=realm, id=gid,
+                                                                              client=cid)
         try:
             return json.loads(to_native(open_url(available_rolemappings_url, method="GET", headers=self.restheaders,
                                                  validate_certs=self.validate_certs).read()))
@@ -512,7 +537,8 @@ class KeycloakAPI(object):
         """
         available_rolemappings_url = URL_CLIENT_ROLEMAPPINGS.format(url=self.baseurl, realm=realm, id=gid, client=cid)
         try:
-            open_url(available_rolemappings_url, method="POST", headers=self.restheaders, data=json.dumps(role_rep), validate_certs=self.validate_certs)
+            open_url(available_rolemappings_url, method="POST", headers=self.restheaders, data=json.dumps(role_rep),
+                     validate_certs=self.validate_certs)
         except Exception as e:
             self.module.fail_json(msg="Could not fetch available rolemappings for client %s in group %s, realm %s: %s"
                                       % (cid, gid, realm, str(e)))
@@ -528,7 +554,8 @@ class KeycloakAPI(object):
         """
         available_rolemappings_url = URL_CLIENT_ROLEMAPPINGS.format(url=self.baseurl, realm=realm, id=gid, client=cid)
         try:
-            open_url(available_rolemappings_url, method="DELETE", headers=self.restheaders, validate_certs=self.validate_certs)
+            open_url(available_rolemappings_url, method="DELETE", headers=self.restheaders,
+                     validate_certs=self.validate_certs)
         except Exception as e:
             self.module.fail_json(msg="Could not delete available rolemappings for client %s in group %s, realm %s: %s"
                                       % (cid, gid, realm, str(e)))
@@ -545,8 +572,9 @@ class KeycloakAPI(object):
             return json.loads(to_native(open_url(url, method='GET', headers=self.restheaders,
                                                  validate_certs=self.validate_certs).read()))
         except ValueError as e:
-            self.module.fail_json(msg='API returned incorrect JSON when trying to obtain list of client templates for realm %s: %s'
-                                      % (realm, str(e)))
+            self.module.fail_json(
+                msg='API returned incorrect JSON when trying to obtain list of client templates for realm %s: %s'
+                    % (realm, str(e)))
         except Exception as e:
             self.module.fail_json(msg='Could not obtain list of client templates for realm %s: %s'
                                       % (realm, str(e)))
@@ -564,8 +592,9 @@ class KeycloakAPI(object):
             return json.loads(to_native(open_url(url, method='GET', headers=self.restheaders,
                                                  validate_certs=self.validate_certs).read()))
         except ValueError as e:
-            self.module.fail_json(msg='API returned incorrect JSON when trying to obtain client templates %s for realm %s: %s'
-                                      % (id, realm, str(e)))
+            self.module.fail_json(
+                msg='API returned incorrect JSON when trying to obtain client templates %s for realm %s: %s'
+                    % (id, realm, str(e)))
         except Exception as e:
             self.module.fail_json(msg='Could not obtain client template %s for realm %s: %s'
                                       % (id, realm, str(e)))
@@ -837,7 +866,8 @@ class KeycloakAPI(object):
 
             for protocolmapper in all_protocolmappers:
                 if protocolmapper['name'] == name:
-                    return self.get_clientscope_protocolmapper_by_protocolmapperid(protocolmapper['id'], cid, realm=realm)
+                    return self.get_clientscope_protocolmapper_by_protocolmapperid(protocolmapper['id'], cid,
+                                                                                   realm=realm)
 
             return None
 
@@ -867,7 +897,8 @@ class KeycloakAPI(object):
         :param mapper_rep: A ProtocolMapperRepresentation of the updated protocolmapper.
         :return HTTPResponse object on success
         """
-        protocolmapper_url = URL_CLIENTSCOPE_PROTOCOLMAPPER.format(url=self.baseurl, realm=realm, id=cid, mapper_id=mapper_rep['id'])
+        protocolmapper_url = URL_CLIENTSCOPE_PROTOCOLMAPPER.format(url=self.baseurl, realm=realm, id=cid,
+                                                                   mapper_id=mapper_rep['id'])
 
         try:
             return open_url(protocolmapper_url, method='PUT', headers=self.restheaders,
@@ -876,6 +907,189 @@ class KeycloakAPI(object):
         except Exception as e:
             self.module.fail_json(msg='Could not update protocolmappers for clientscope %s in realm %s: %s'
                                       % (mapper_rep, realm, str(e)))
+
+    def create_clientscope_realm_scopemappings(self, cid, roles, realm="master"):
+        scopemappings_realm_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM.format(url=self.baseurl, realm=realm, id=cid)
+
+        realm_roles = []
+        for role_name in roles:
+            role = self.get_realm_role(name=role_name, realm=realm)
+            realm_roles.append({'id': role['id']})
+
+        try:
+            return open_url(scopemappings_realm_url, method='POST', headers=self.restheaders,
+                            data=json.dumps(realm_roles), validate_certs=self.validate_certs)
+
+        except Exception as e:
+            self.module.fail_json(msg='Could not create realm scopemappings for clientscope %s in realm %s: %s'
+                                      % (cid, realm, str(e)))
+
+    def get_clientscope_realm_scopemappings(self, cid, realm="master"):
+        scopemappings_realm_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM.format(url=self.baseurl, realm=realm, id=cid)
+
+        try:
+            realm_roles = json.loads(to_native(open_url(scopemappings_realm_url, method='GET', headers=self.restheaders,
+                                                        validate_certs=self.validate_certs).read()))
+
+        except Exception as e:
+            self.module.fail_json(msg='Could not get realm scopemappings for clientscope %s in realm %s: %s'
+                                      % (cid, realm, str(e)))
+
+        return realm_roles
+
+    def get_clientscope_realm_available_scopemappings(self, cid, realm="master"):
+        scopemappings_realm_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM_AVAILABLE.format(url=self.baseurl, realm=realm, id=cid)
+
+        try:
+            realm_roles = json.loads(to_native(open_url(scopemappings_realm_url, method='GET', headers=self.restheaders,
+                                                        validate_certs=self.validate_certs).read()))
+
+        except Exception as e:
+            self.module.fail_json(msg='Could not get realm scopemappings for clientscope %s in realm %s: %s'
+                                      % (cid, realm, str(e)))
+
+        return realm_roles
+
+    def get_clientscope_realm_composite_scopemappings(self, cid, realm="master"):
+        scopemappings_realm_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM_COMPOSITE.format(url=self.baseurl, realm=realm, id=cid)
+
+        try:
+            realm_roles = json.loads(to_native(open_url(scopemappings_realm_url, method='GET', headers=self.restheaders,
+                                                        validate_certs=self.validate_certs).read()))
+
+        except Exception as e:
+            self.module.fail_json(msg='Could not get realm scopemappings for clientscope %s in realm %s: %s'
+                                      % (cid, realm, str(e)))
+
+        return realm_roles
+
+    def get_clientscope_realm_scopemapping_by_id(self, cid, role_id, realm="master"):
+        scopemappings_realm_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM.format(url=self.baseurl, realm=realm, id=cid)
+
+        try:
+            realm_roles = json.loads(to_native(open_url(scopemappings_realm_url, method='GET', headers=self.restheaders,
+                                                        validate_certs=self.validate_certs).read()))
+
+            for role in realm_roles:
+                if role['id'] == role_id:
+                    return role
+
+        except Exception as e:
+            self.module.fail_json(msg='Could not get realm scopemapping for clientscope %s in realm %s: %s'
+                                      % (cid, realm, str(e)))
+
+        return None
+
+    def delete_clientscope_realm_scopemappings(self, cid, roles, realm="master"):
+        scopemappings_realm_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM.format(url=self.baseurl, realm=realm, id=cid)
+
+        realm_roles = []
+        for role_name in roles:
+            role = self.get_realm_role(name=role_name, realm=realm)
+            realm_roles.append({'id': role['id']})
+
+        try:
+            return open_url(scopemappings_realm_url, method='DELETE', headers=self.restheaders,
+                            data=json.dumps(realm_roles), validate_certs=self.validate_certs)
+
+        except Exception as e:
+            self.module.fail_json(msg='Could not delete realm scopemappings for clientscope %s in realm %s: %s'
+                                      % (cid, realm, str(e)))
+
+    def create_clientscope_client_scopemappings(self, csid, cid, roles, realm="master"):
+        scopemappings_client_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_CLIENT.format(url=self.baseurl, realm=realm, id=csid,
+                                                                               client_id=cid)
+
+        client_roles = [{"name": x} for x in roles]
+
+        try:
+            return open_url(scopemappings_client_url, method='POST', headers=self.restheaders,
+                            data=json.dumps(client_roles), validate_certs=self.validate_certs)
+
+        except Exception as e:
+            self.module.fail_json(
+                msg='Could not create client scopemappings for clientscope %s in realm %s and client %s: %s'
+                    % (csid, realm, cid, str(e)))
+
+    def get_clientscope_client_scopemappings(self, csid, cid, realm="master"):
+        scopemappings_client_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_CLIENT.format(url=self.baseurl, realm=realm, id=csid,
+                                                                               client_id=cid)
+        try:
+            client_roles = json.loads(
+                to_native(open_url(scopemappings_client_url, method='GET', headers=self.restheaders,
+                                   validate_certs=self.validate_certs).read()))
+
+        except Exception as e:
+            self.module.fail_json(
+                msg='Could not get client scopemappings for clientscope %s in realm %s and client %s: %s'
+                    % (csid, realm, cid, str(e)))
+
+        return client_roles
+
+    def get_clientscope_client_available_scopemappings(self, csid, cid, realm="master"):
+        scopemappings_client_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_CLIENT_AVAILABLE.format(url=self.baseurl, realm=realm,
+                                                                                         id=csid,
+                                                                                         client_id=cid)
+        try:
+            client_roles = json.loads(
+                to_native(open_url(scopemappings_client_url, method='GET', headers=self.restheaders,
+                                   validate_certs=self.validate_certs).read()))
+
+        except Exception as e:
+            self.module.fail_json(
+                msg='Could not get available client scopemappings for clientscope %s in realm %s and client %s: %s'
+                    % (csid, realm, cid, str(e)))
+
+        return client_roles
+
+    def get_clientscope_client_composite_scopemappings(self, csid, cid, realm="master"):
+        scopemappings_client_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_CLIENT_COMPOSITE.format(url=self.baseurl, realm=realm,
+                                                                                         id=csid,
+                                                                                         client_id=cid)
+        try:
+            client_roles = json.loads(
+                to_native(open_url(scopemappings_client_url, method='GET', headers=self.restheaders,
+                                   validate_certs=self.validate_certs).read()))
+
+        except Exception as e:
+            self.module.fail_json(
+                msg='Could not get composite client scopemappings for clientscope %s in realm %s and client %s: %s'
+                    % (csid, realm, cid, str(e)))
+
+        return client_roles
+
+    def get_clientscope_client_scopemapping_by_id(self, csid, cid, role_id, realm="master"):
+        scopemappings_client_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_CLIENT.format(url=self.baseurl, realm=realm, id=csid,
+                                                                               client_id=cid)
+        try:
+            client_roles = json.loads(
+                to_native(open_url(scopemappings_client_url, method='GET', headers=self.restheaders,
+                                   validate_certs=self.validate_certs).read()))
+
+            for role in client_roles:
+                if role['id'] == role_id:
+                    return role
+
+        except Exception as e:
+            self.module.fail_json(
+                msg='Could not get client scopemapping for clientscope %s in realm %s and client %s: %s'
+                    % (csid, realm, cid, str(e)))
+
+        return None
+
+    def delete_clientscope_client_scopemappings(self, csid, cid, roles, realm="master"):
+        scopemappings_client_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_CLIENT.format(url=self.baseurl, realm=realm, id=csid,
+                                                                               client_id=cid)
+        client_roles = [{"name": x} for x in roles]
+
+        try:
+            return open_url(scopemappings_client_url, method='DELETE', headers=self.restheaders,
+                            data=json.dumps(client_roles), validate_certs=self.validate_certs)
+
+        except Exception as e:
+            self.module.fail_json(
+                msg='Could not delete client scopemappings for clientscope %s in realm %s and client %s: %s'
+                    % (csid, realm, cid, str(e)))
 
     def get_groups(self, realm="master"):
         """ Fetch the name and ID of all groups on the Keycloak server.
@@ -1024,6 +1238,21 @@ class KeycloakAPI(object):
             self.module.fail_json(msg='Could not obtain list of roles for realm %s: %s'
                                       % (realm, str(e)))
 
+    def get_realm_role_by_id(self, role_id, realm='master'):
+        """ Fetch a Keycloak role from the provided realm using the role's id.
+
+        If the role does not exist, None is returned.
+        :param role_id: ID of the realm role
+        :param realm: Realm in which the role resides; default 'master'
+        """
+        roles = self.get_realm_roles(realm)
+
+        for role in roles:
+            if role_id == role['id']:
+                return role
+
+        return None
+
     def get_realm_role(self, name, realm='master'):
         """ Fetch a keycloak role from the provided realm using the role's name.
 
@@ -1103,8 +1332,9 @@ class KeycloakAPI(object):
             return json.loads(to_native(open_url(rolelist_url, method='GET', headers=self.restheaders,
                                                  validate_certs=self.validate_certs).read()))
         except ValueError as e:
-            self.module.fail_json(msg='API returned incorrect JSON when trying to obtain list of roles for client %s in realm %s: %s'
-                                      % (clientid, realm, str(e)))
+            self.module.fail_json(
+                msg='API returned incorrect JSON when trying to obtain list of roles for client %s in realm %s: %s'
+                    % (clientid, realm, str(e)))
         except Exception as e:
             self.module.fail_json(msg='Could not obtain list of roles for client %s in realm %s: %s'
                                       % (clientid, realm, str(e)))
@@ -1205,7 +1435,9 @@ class KeycloakAPI(object):
         try:
             authentication_flow = {}
             # Check if the authentication flow exists on the Keycloak serveraders
-            authentications = json.load(open_url(URL_AUTHENTICATION_FLOWS.format(url=self.baseurl, realm=realm), method='GET', headers=self.restheaders))
+            authentications = json.load(
+                open_url(URL_AUTHENTICATION_FLOWS.format(url=self.baseurl, realm=realm), method='GET',
+                         headers=self.restheaders))
             for authentication in authentications:
                 if authentication["alias"] == alias:
                     authentication_flow = authentication
@@ -1228,7 +1460,7 @@ class KeycloakAPI(object):
                             validate_certs=self.validate_certs)
         except Exception as e:
             self.module.fail_json(msg='Could not delete authentication flow %s in realm %s: %s'
-                                  % (id, realm, str(e)))
+                                      % (id, realm, str(e)))
 
     def copy_auth_flow(self, config, realm='master'):
         """
@@ -1261,7 +1493,7 @@ class KeycloakAPI(object):
             return None
         except Exception as e:
             self.module.fail_json(msg='Could not copy authentication flow %s in realm %s: %s'
-                                  % (config["alias"], realm, str(e)))
+                                      % (config["alias"], realm, str(e)))
 
     def create_empty_auth_flow(self, config, realm='master'):
         """
@@ -1297,7 +1529,7 @@ class KeycloakAPI(object):
             return None
         except Exception as e:
             self.module.fail_json(msg='Could not create empty authentication flow %s in realm %s: %s'
-                                  % (config["alias"], realm, str(e)))
+                                      % (config["alias"], realm, str(e)))
 
     def update_authentication_executions(self, flowAlias, updatedExec, realm='master'):
         """ Update authentication executions
@@ -1444,7 +1676,7 @@ class KeycloakAPI(object):
             return executions
         except Exception as e:
             self.module.fail_json(msg='Could not get executions for authentication flow %s in realm %s: %s'
-                                  % (config["alias"], realm, str(e)))
+                                      % (config["alias"], realm, str(e)))
 
     def get_identity_providers(self, realm='master'):
         """ Fetch representations for identity providers in a realm
@@ -1456,8 +1688,9 @@ class KeycloakAPI(object):
             return json.loads(to_native(open_url(idps_url, method='GET', headers=self.restheaders,
                                                  validate_certs=self.validate_certs).read()))
         except ValueError as e:
-            self.module.fail_json(msg='API returned incorrect JSON when trying to obtain list of identity providers for realm %s: %s'
-                                      % (realm, str(e)))
+            self.module.fail_json(
+                msg='API returned incorrect JSON when trying to obtain list of identity providers for realm %s: %s'
+                    % (realm, str(e)))
         except Exception as e:
             self.module.fail_json(msg='Could not obtain list of identity providers for realm %s: %s'
                                       % (realm, str(e)))
@@ -1534,8 +1767,9 @@ class KeycloakAPI(object):
             return json.loads(to_native(open_url(mappers_url, method='GET', headers=self.restheaders,
                                                  validate_certs=self.validate_certs).read()))
         except ValueError as e:
-            self.module.fail_json(msg='API returned incorrect JSON when trying to obtain list of identity provider mappers for idp %s in realm %s: %s'
-                                      % (alias, realm, str(e)))
+            self.module.fail_json(
+                msg='API returned incorrect JSON when trying to obtain list of identity provider mappers for idp %s in realm %s: %s'
+                    % (alias, realm, str(e)))
         except Exception as e:
             self.module.fail_json(msg='Could not obtain list of identity provider mappers for idp %s in realm %s: %s'
                                       % (alias, realm, str(e)))
@@ -1619,8 +1853,9 @@ class KeycloakAPI(object):
             return json.loads(to_native(open_url(comps_url, method='GET', headers=self.restheaders,
                                                  validate_certs=self.validate_certs).read()))
         except ValueError as e:
-            self.module.fail_json(msg='API returned incorrect JSON when trying to obtain list of components for realm %s: %s'
-                                      % (realm, str(e)))
+            self.module.fail_json(
+                msg='API returned incorrect JSON when trying to obtain list of components for realm %s: %s'
+                    % (realm, str(e)))
         except Exception as e:
             self.module.fail_json(msg='Could not obtain list of components for realm %s: %s'
                                       % (realm, str(e)))
