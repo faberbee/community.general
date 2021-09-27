@@ -73,6 +73,9 @@ URL_CLIENT_ROLEMAPPINGS = "{url}/admin/realms/{realm}/groups/{id}/role-mappings/
 URL_CLIENT_ROLEMAPPINGS_AVAILABLE = "{url}/admin/realms/{realm}/groups/{id}/role-mappings/clients/{client}/available"
 URL_CLIENT_ROLEMAPPINGS_COMPOSITE = "{url}/admin/realms/{realm}/groups/{id}/role-mappings/clients/{client}/composite"
 
+URL_CLIENT_DEFAULTCLIENTSCOPES = "{url}/admin/realms/{realm}/clients/{id}/default-client-scopes"
+URL_CLIENT_DEFAULTCLIENTSCOPE = "{url}/admin/realms/{realm}/clients/{id}/default-client-scopes/{client_scope_id}"
+
 URL_AUTHENTICATION_FLOWS = "{url}/admin/realms/{realm}/authentication/flows"
 URL_AUTHENTICATION_FLOW = "{url}/admin/realms/{realm}/authentication/flows/{id}"
 URL_AUTHENTICATION_FLOW_COPY = "{url}/admin/realms/{realm}/authentication/flows/{copyfrom}/copy"
@@ -426,6 +429,55 @@ class KeycloakAPI(object):
         except Exception as e:
             self.module.fail_json(msg='Could not delete client %s in realm %s: %s'
                                       % (id, realm, str(e)))
+
+    def get_client_defaultclientscopes(self, cid, realm="master"):
+        """ Fetch default client scopes for a client on the Keycloak server.
+
+        :param cid: ID of the client from which to obtain the default client scopes.
+        :param realm: REalm from which to obtain the default client scopes.
+        :return: The default client scopes of a specified client in a realm (default "master").
+        """
+        default_client_scopes_url = URL_CLIENT_DEFAULTCLIENTSCOPES.format(url=self.baseurl, realm=realm, id=cid)
+        try:
+            return json.loads(to_native(open_url(default_client_scopes_url, method="GET", headers=self.restheaders,
+                                                 validate_certs=self.validate_certs).read()))
+        except Exception as e:
+            self.module.fail_json(msg="Could not fetch default_client_scopes for client %s in realm %s: %s"
+                                      % (cid, realm, str(e)))
+
+    def add_client_defaultclientscope(self, cid, csid, realm="master"):
+        """ Add a default client scope for a client on the Keycloak server.
+
+        :param cid: ID of the client from which to obtain the default client scopes.
+        :param csid: ID of the client scope to add to the default client scopes list
+        :param realm: REalm from which to obtain the default client scopes.
+        """
+        default_client_scope_url = URL_CLIENT_DEFAULTCLIENTSCOPE.format(url=self.baseurl, realm=realm, id=cid,
+                                                                        client_scope_id=csid)
+        try:
+            open_url(default_client_scope_url, method="PUT", headers=self.restheaders,
+                     validate_certs=self.validate_certs)
+        except Exception as e:
+            self.module.fail_json(
+                msg="Could not add client scope %s to default_client_scopes for client %s in realm %s: %s"
+                    % (csid, cid, realm, str(e)))
+
+    def delete_client_defaultclientscope(self, cid, csid, realm="master"):
+        """ Delete a default client scope for a client on the Keycloak server.
+
+        :param cid: ID of the client from which to obtain the default client scopes.
+        :param csid: ID of the client scope to add to the default client scopes list
+        :param realm: REalm from which to obtain the default client scopes.
+        """
+        default_client_scope_url = URL_CLIENT_DEFAULTCLIENTSCOPE.format(url=self.baseurl, realm=realm, id=cid,
+                                                                        client_scope_id=csid)
+        try:
+            open_url(default_client_scope_url, method="DELETE", headers=self.restheaders,
+                     validate_certs=self.validate_certs)
+        except Exception as e:
+            self.module.fail_json(
+                msg="Could not remove client scope %s to default_client_scopes for client %s in realm %s: %s"
+                    % (csid, cid, realm, str(e)))
 
     def get_client_roles_by_id(self, cid, realm="master"):
         """ Fetch the roles of the a client on the Keycloak server.
@@ -938,7 +990,8 @@ class KeycloakAPI(object):
         return realm_roles
 
     def get_clientscope_realm_available_scopemappings(self, cid, realm="master"):
-        scopemappings_realm_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM_AVAILABLE.format(url=self.baseurl, realm=realm, id=cid)
+        scopemappings_realm_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM_AVAILABLE.format(url=self.baseurl, realm=realm,
+                                                                                       id=cid)
 
         try:
             realm_roles = json.loads(to_native(open_url(scopemappings_realm_url, method='GET', headers=self.restheaders,
@@ -951,7 +1004,8 @@ class KeycloakAPI(object):
         return realm_roles
 
     def get_clientscope_realm_composite_scopemappings(self, cid, realm="master"):
-        scopemappings_realm_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM_COMPOSITE.format(url=self.baseurl, realm=realm, id=cid)
+        scopemappings_realm_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM_COMPOSITE.format(url=self.baseurl, realm=realm,
+                                                                                       id=cid)
 
         try:
             realm_roles = json.loads(to_native(open_url(scopemappings_realm_url, method='GET', headers=self.restheaders,
