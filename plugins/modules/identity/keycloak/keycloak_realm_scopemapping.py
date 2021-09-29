@@ -269,8 +269,8 @@ def main():
                     module.fail_json(msg='Could not fetch role %s' % (role['id']))
 
     # Get effective client-level role mappings
-    available_roles_before = kc.get_clientscope_realm_available_scopemappings(csid, realm=realm)
-    assigned_roles_before = kc.get_clientscope_realm_composite_scopemappings(csid, realm=realm)
+    available_roles_before = kc.get_clientscope_available_realm_scopemappings(csid, realm=realm)
+    assigned_roles_before = kc.get_clientscope_composite_realm_scopemappings(csid, realm=realm)
 
     result['existing'] = assigned_roles_before
     result['proposed'] = roles
