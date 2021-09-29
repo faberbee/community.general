@@ -58,6 +58,9 @@ URL_CLIENTTEMPLATES = "{url}/admin/realms/{realm}/client-templates"
 URL_GROUPS = "{url}/admin/realms/{realm}/groups"
 URL_GROUP = "{url}/admin/realms/{realm}/groups/{groupid}"
 
+URL_USERS = "{url}/admin/realms/{realm}/users"
+URL_USER = "{url}/admin/realms/{realm}/users/{user_id}"
+
 URL_CLIENTSCOPES = "{url}/admin/realms/{realm}/client-scopes"
 URL_CLIENTSCOPE = "{url}/admin/realms/{realm}/client-scopes/{id}"
 URL_CLIENTSCOPE_PROTOCOLMAPPERS = "{url}/admin/realms/{realm}/client-scopes/{id}/protocol-mappers/models"
@@ -69,12 +72,26 @@ URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM = "{url}/admin/realms/{realm}/client-scopes/
 URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM_AVAILABLE = "{url}/admin/realms/{realm}/client-scopes/{id}/scope-mappings/realm/available"
 URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM_COMPOSITE = "{url}/admin/realms/{realm}/client-scopes/{id}/scope-mappings/realm/composite"
 
-URL_CLIENT_ROLEMAPPINGS = "{url}/admin/realms/{realm}/groups/{id}/role-mappings/clients/{client}"
-URL_CLIENT_ROLEMAPPINGS_AVAILABLE = "{url}/admin/realms/{realm}/groups/{id}/role-mappings/clients/{client}/available"
-URL_CLIENT_ROLEMAPPINGS_COMPOSITE = "{url}/admin/realms/{realm}/groups/{id}/role-mappings/clients/{client}/composite"
+URL_GROUP_ROLEMAPPINGS_CLIENT = "{url}/admin/realms/{realm}/groups/{id}/role-mappings/clients/{client}"
+URL_GROUP_ROLEMAPPINGS_CLIENT_AVAILABLE = "{url}/admin/realms/{realm}/groups/{id}/role-mappings/clients/{client}/available"
+URL_GROUP_ROLEMAPPINGS_CLIENT_COMPOSITE = "{url}/admin/realms/{realm}/groups/{id}/role-mappings/clients/{client}/composite"
+
+URL_USER_ROLEMAPPINGS_CLIENT = "{url}/admin/realms/{realm}/users/{id}/role-mappings/clients/{client}"
+URL_USER_ROLEMAPPINGS_CLIENT_AVAILABLE = "{url}/admin/realms/{realm}/users/{id}/role-mappings/clients/{client}/available"
+URL_USER_ROLEMAPPINGS_CLIENT_COMPOSITE = "{url}/admin/realms/{realm}/users/{id}/role-mappings/clients/{client}/composite"
+
+URL_GROUP_ROLEMAPPINGS_REALM = "{url}/admin/realms/{realm}/groups/{id}/role-mappings/realm"
+URL_GROUP_ROLEMAPPINGS_REALM_AVAILABLE = "{url}/admin/realms/{realm}/groups/{id}/role-mappings/realm/available"
+URL_GROUP_ROLEMAPPINGS_REALM_COMPOSITE = "{url}/admin/realms/{realm}/groups/{id}/role-mappings/realm/composite"
+
+URL_USER_ROLEMAPPINGS_REALM = "{url}/admin/realms/{realm}/users/{id}/role-mappings/realm"
+URL_USER_ROLEMAPPINGS_REALM_AVAILABLE = "{url}/admin/realms/{realm}/users/{id}/role-mappings/realm/available"
+URL_USER_ROLEMAPPINGS_REALM_COMPOSITE = "{url}/admin/realms/{realm}/users/{id}/role-mappings/realm/composite"
 
 URL_CLIENT_DEFAULTCLIENTSCOPES = "{url}/admin/realms/{realm}/clients/{id}/default-client-scopes"
 URL_CLIENT_DEFAULTCLIENTSCOPE = "{url}/admin/realms/{realm}/clients/{id}/default-client-scopes/{client_scope_id}"
+
+URL_CLIENT_SERVICEACCOUNT = "{url}/admin/realms/{realm}/clients/{id}/service-account-user"
 
 URL_AUTHENTICATION_FLOWS = "{url}/admin/realms/{realm}/authentication/flows"
 URL_AUTHENTICATION_FLOW = "{url}/admin/realms/{realm}/authentication/flows/{id}"
@@ -434,7 +451,7 @@ class KeycloakAPI(object):
         """ Fetch default client scopes for a client on the Keycloak server.
 
         :param cid: ID of the client from which to obtain the default client scopes.
-        :param realm: REalm from which to obtain the default client scopes.
+        :param realm: Realm from which to obtain the default client scopes.
         :return: The default client scopes of a specified client in a realm (default "master").
         """
         default_client_scopes_url = URL_CLIENT_DEFAULTCLIENTSCOPES.format(url=self.baseurl, realm=realm, id=cid)
@@ -450,7 +467,7 @@ class KeycloakAPI(object):
 
         :param cid: ID of the client from which to obtain the default client scopes.
         :param csid: ID of the client scope to add to the default client scopes list
-        :param realm: REalm from which to obtain the default client scopes.
+        :param realm: Realm from which to obtain the default client scopes.
         """
         default_client_scope_url = URL_CLIENT_DEFAULTCLIENTSCOPE.format(url=self.baseurl, realm=realm, id=cid,
                                                                         client_scope_id=csid)
@@ -461,6 +478,23 @@ class KeycloakAPI(object):
             self.module.fail_json(
                 msg="Could not add client scope %s to default_client_scopes for client %s in realm %s: %s"
                     % (csid, cid, realm, str(e)))
+
+    def get_client_serviceaccountuser(self, cid, realm="master"):
+        """ Fetch the user dedicated to the service account
+
+        :param cid: ID of the client from which to obtain the service account user
+        :param realm: Realm of client
+        :return: User representation of the service account user
+        """
+
+        service_account_user_url = URL_CLIENT_SERVICEACCOUNT.format(url=self.baseurl, realm=realm, id=cid)
+
+        try:
+            return json.loads(to_native(open_url(service_account_user_url, method="GET", headers=self.restheaders,
+                                                 validate_certs=self.validate_certs).read()))
+        except Exception as e:
+            self.module.fail_json(msg="Could not fetch service account user for client %s in realm %s: %s"
+                                      % (cid, realm, str(e)))
 
     def delete_client_defaultclientscope(self, cid, csid, realm="master"):
         """ Delete a default client scope for a client on the Keycloak server.
@@ -523,7 +557,7 @@ class KeycloakAPI(object):
                 return role['id']
         return None
 
-    def get_client_rolemapping_by_id(self, gid, cid, rid, realm='master'):
+    def get_group_client_rolemapping_by_id(self, gid, cid, rid, realm='master'):
         """ Obtain client representation by id
 
         :param gid: ID of the group from which to obtain the rolemappings.
@@ -532,7 +566,7 @@ class KeycloakAPI(object):
         :param realm: client from this realm
         :return: dict of rolemapping representation or None if none matching exist
         """
-        rolemappings_url = URL_CLIENT_ROLEMAPPINGS.format(url=self.baseurl, realm=realm, id=gid, client=cid)
+        rolemappings_url = URL_GROUP_ROLEMAPPINGS_CLIENT.format(url=self.baseurl, realm=realm, id=gid, client=cid)
         try:
             rolemappings = json.loads(to_native(open_url(rolemappings_url, method="GET", headers=self.restheaders,
                                                          validate_certs=self.validate_certs).read()))
@@ -544,7 +578,7 @@ class KeycloakAPI(object):
                                       % (cid, gid, realm, str(e)))
         return None
 
-    def get_client_available_rolemappings(self, gid, cid, realm="master"):
+    def get_group_available_client_rolemappings(self, gid, cid, realm="master"):
         """ Fetch the available role of a client in a specified goup on the Keycloak server.
 
         :param gid: ID of the group from which to obtain the rolemappings.
@@ -552,8 +586,9 @@ class KeycloakAPI(object):
         :param realm: Realm from which to obtain the rolemappings.
         :return: The rollemappings of specified group and client of the realm (default "master").
         """
-        available_rolemappings_url = URL_CLIENT_ROLEMAPPINGS_AVAILABLE.format(url=self.baseurl, realm=realm, id=gid,
-                                                                              client=cid)
+        available_rolemappings_url = URL_GROUP_ROLEMAPPINGS_CLIENT_AVAILABLE.format(url=self.baseurl, realm=realm,
+                                                                                    id=gid,
+                                                                                    client=cid)
         try:
             return json.loads(to_native(open_url(available_rolemappings_url, method="GET", headers=self.restheaders,
                                                  validate_certs=self.validate_certs).read()))
@@ -561,7 +596,7 @@ class KeycloakAPI(object):
             self.module.fail_json(msg="Could not fetch available rolemappings for client %s in group %s, realm %s: %s"
                                       % (cid, gid, realm, str(e)))
 
-    def get_client_composite_rolemappings(self, gid, cid, realm="master"):
+    def get_group_composite_client_rolemappings(self, gid, cid, realm="master"):
         """ Fetch the composite role of a client in a specified group on the Keycloak server.
 
         :param gid: ID of the group from which to obtain the rolemappings.
@@ -569,8 +604,9 @@ class KeycloakAPI(object):
         :param realm: Realm from which to obtain the rolemappings.
         :return: The rollemappings of specified group and client of the realm (default "master").
         """
-        available_rolemappings_url = URL_CLIENT_ROLEMAPPINGS_COMPOSITE.format(url=self.baseurl, realm=realm, id=gid,
-                                                                              client=cid)
+        available_rolemappings_url = URL_GROUP_ROLEMAPPINGS_CLIENT_COMPOSITE.format(url=self.baseurl, realm=realm,
+                                                                                    id=gid,
+                                                                                    client=cid)
         try:
             return json.loads(to_native(open_url(available_rolemappings_url, method="GET", headers=self.restheaders,
                                                  validate_certs=self.validate_certs).read()))
@@ -578,7 +614,7 @@ class KeycloakAPI(object):
             self.module.fail_json(msg="Could not fetch available rolemappings for client %s in group %s, realm %s: %s"
                                       % (cid, gid, realm, str(e)))
 
-    def add_group_rolemapping(self, gid, cid, role_rep, realm="master"):
+    def add_group_client_rolemapping(self, gid, cid, role_rep, realm="master"):
         """ Fetch the composite role of a client in a specified goup on the Keycloak server.
 
         :param gid: ID of the group from which to obtain the rolemappings.
@@ -587,7 +623,8 @@ class KeycloakAPI(object):
         :param realm: Realm from which to obtain the rolemappings.
         :return: None.
         """
-        available_rolemappings_url = URL_CLIENT_ROLEMAPPINGS.format(url=self.baseurl, realm=realm, id=gid, client=cid)
+        available_rolemappings_url = URL_GROUP_ROLEMAPPINGS_CLIENT.format(url=self.baseurl, realm=realm, id=gid,
+                                                                          client=cid)
         try:
             open_url(available_rolemappings_url, method="POST", headers=self.restheaders, data=json.dumps(role_rep),
                      validate_certs=self.validate_certs)
@@ -595,22 +632,284 @@ class KeycloakAPI(object):
             self.module.fail_json(msg="Could not fetch available rolemappings for client %s in group %s, realm %s: %s"
                                       % (cid, gid, realm, str(e)))
 
-    def delete_group_rolemapping(self, gid, cid, role_rep, realm="master"):
+    def delete_group_client_rolemapping(self, gid, cid, role_rep, realm="master"):
         """ Delete the rolemapping of a client in a specified group on the Keycloak server.
 
         :param gid: ID of the group from which to obtain the rolemappings.
+        :param cid: ID of the client from which to obtain the rolemappings.
+        :param role_rep: Representation of the role to delete.
+        :param realm: Realm from which to obtain the rolemappings.
+        :return: None.
+        """
+        available_rolemappings_url = URL_GROUP_ROLEMAPPINGS_CLIENT.format(url=self.baseurl, realm=realm, id=gid,
+                                                                          client=cid)
+        try:
+            open_url(available_rolemappings_url, method="DELETE", headers=self.restheaders,
+                     data=json.dumps(role_rep), validate_certs=self.validate_certs)
+        except Exception as e:
+            self.module.fail_json(msg="Could not delete available rolemappings for client %s in group %s, realm %s: %s"
+                                      % (cid, gid, realm, str(e)))
+
+    def get_user_client_rolemapping_by_id(self, uid, cid, rid, realm='master'):
+        """ Obtain client representation by id
+
+        :param uid: ID of the user from which to obtain the rolemappings.
+        :param cid: ID of the client from which to obtain the rolemappings.
+        :param rid: ID of the role.
+        :param realm: client from this realm
+        :return: dict of rolemapping representation or None if none matching exist
+        """
+        rolemappings_url = URL_USER_ROLEMAPPINGS_CLIENT.format(url=self.baseurl, realm=realm, id=uid, client=cid)
+        try:
+            rolemappings = json.loads(to_native(open_url(rolemappings_url, method="GET", headers=self.restheaders,
+                                                         validate_certs=self.validate_certs).read()))
+            for role in rolemappings:
+                if rid == role['id']:
+                    return role
+        except Exception as e:
+            self.module.fail_json(msg="Could not fetch rolemappings for client %s in user %s, realm %s: %s"
+                                      % (cid, uid, realm, str(e)))
+        return None
+
+    def get_user_available_client_rolemappings(self, uid, cid, realm="master"):
+        """ Fetch the available role of a client in a specified user on the Keycloak server.
+
+        :param uid: ID of the user from which to obtain the rolemappings.
+        :param cid: ID of the client from which to obtain the rolemappings.
+        :param realm: Realm from which to obtain the rolemappings.
+        :return: The rollemappings of specified group and client of the realm (default "master").
+        """
+        available_rolemappings_url = URL_USER_ROLEMAPPINGS_CLIENT_AVAILABLE.format(url=self.baseurl, realm=realm,
+                                                                                   id=uid,
+                                                                                   client=cid)
+        try:
+            return json.loads(to_native(open_url(available_rolemappings_url, method="GET", headers=self.restheaders,
+                                                 validate_certs=self.validate_certs).read()))
+        except Exception as e:
+            self.module.fail_json(msg="Could not fetch available rolemappings for client %s in user %s, realm %s: %s"
+                                      % (cid, uid, realm, str(e)))
+
+    def get_user_composite_client_rolemappings(self, uid, cid, realm="master"):
+        """ Fetch the composite role of a client in a specified user on the Keycloak server.
+
+        :param uid: ID of the user from which to obtain the rolemappings.
+        :param cid: ID of the client from which to obtain the rolemappings.
+        :param realm: Realm from which to obtain the rolemappings.
+        :return: The rollemappings of specified group and client of the realm (default "master").
+        """
+        available_rolemappings_url = URL_USER_ROLEMAPPINGS_CLIENT_COMPOSITE.format(url=self.baseurl, realm=realm,
+                                                                                   id=uid,
+                                                                                   client=cid)
+        try:
+            return json.loads(to_native(open_url(available_rolemappings_url, method="GET", headers=self.restheaders,
+                                                 validate_certs=self.validate_certs).read()))
+        except Exception as e:
+            self.module.fail_json(msg="Could not fetch available rolemappings for client %s in user %s, realm %s: %s"
+                                      % (cid, uid, realm, str(e)))
+
+    def add_user_client_rolemapping(self, uid, cid, role_rep, realm="master"):
+        """ Fetch the composite role of a client in a specified user on the Keycloak server.
+
+        :param uid: ID of the user from which to obtain the rolemappings.
         :param cid: ID of the client from which to obtain the rolemappings.
         :param role_rep: Representation of the role to assign.
         :param realm: Realm from which to obtain the rolemappings.
         :return: None.
         """
-        available_rolemappings_url = URL_CLIENT_ROLEMAPPINGS.format(url=self.baseurl, realm=realm, id=gid, client=cid)
+        available_rolemappings_url = URL_USER_ROLEMAPPINGS_CLIENT.format(url=self.baseurl, realm=realm, id=uid,
+                                                                         client=cid)
         try:
-            open_url(available_rolemappings_url, method="DELETE", headers=self.restheaders,
+            open_url(available_rolemappings_url, method="POST", headers=self.restheaders, data=json.dumps(role_rep),
                      validate_certs=self.validate_certs)
         except Exception as e:
-            self.module.fail_json(msg="Could not delete available rolemappings for client %s in group %s, realm %s: %s"
-                                      % (cid, gid, realm, str(e)))
+            self.module.fail_json(msg="Could not fetch available rolemappings for client %s in user %s, realm %s: %s"
+                                      % (cid, uid, realm, str(e)))
+
+    def delete_user_client_rolemapping(self, uid, cid, role_rep, realm="master"):
+        """ Delete the rolemapping of a client in a specified user on the Keycloak server.
+
+        :param uid: ID of the user from which to obtain the rolemappings.
+        :param cid: ID of the client from which to obtain the rolemappings.
+        :param role_rep: Representation of the role to delete.
+        :param realm: Realm from which to obtain the rolemappings.
+        :return: None.
+        """
+        available_rolemappings_url = URL_USER_ROLEMAPPINGS_CLIENT.format(url=self.baseurl, realm=realm, id=uid,
+                                                                         client=cid)
+        try:
+            open_url(available_rolemappings_url, method="DELETE", headers=self.restheaders,
+                     data=json.dumps(role_rep), validate_certs=self.validate_certs)
+        except Exception as e:
+            self.module.fail_json(msg="Could not delete available rolemappings for client %s in user %s, realm %s: %s"
+                                      % (cid, uid, realm, str(e)))
+
+    def get_group_realm_rolemapping_by_id(self, gid, rid, realm='master'):
+        """ Obtain client representation by id
+
+        :param gid: ID of the group from which to obtain the rolemappings.
+        :param rid: ID of the role.
+        :param realm: client from this realm
+        :return: dict of rolemapping representation or None if none matching exist
+        """
+        rolemappings_url = URL_GROUP_ROLEMAPPINGS_REALM.format(url=self.baseurl, realm=realm, id=gid, client=cid)
+        try:
+            rolemappings = json.loads(to_native(open_url(rolemappings_url, method="GET", headers=self.restheaders,
+                                                         validate_certs=self.validate_certs).read()))
+            for role in rolemappings:
+                if rid == role['id']:
+                    return role
+        except Exception as e:
+            self.module.fail_json(msg="Could not fetch rolemappings for group %s, realm %s: %s"
+                                      % (gid, realm, str(e)))
+        return None
+
+    def get_group_available_realm_rolemappings(self, gid, realm="master"):
+        """ Fetch the available role of the realm in a specified goup on the Keycloak server.
+
+        :param gid: ID of the group from which to obtain the rolemappings.
+        :param realm: Realm from which to obtain the rolemappings.
+        :return: The rollemappings of specified group and client of the realm (default "master").
+        """
+        available_rolemappings_url = URL_GROUP_ROLEMAPPINGS_REALM_AVAILABLE.format(url=self.baseurl, realm=realm,
+                                                                                   id=gid)
+        try:
+            return json.loads(to_native(open_url(available_rolemappings_url, method="GET", headers=self.restheaders,
+                                                 validate_certs=self.validate_certs).read()))
+        except Exception as e:
+            self.module.fail_json(msg="Could not fetch available rolemappings for group %s, realm %s: %s"
+                                      % (gid, realm, str(e)))
+
+    def get_group_composite_realm_rolemappings(self, gid, realm="master"):
+        """ Fetch the composite role of the realm in a specified group on the Keycloak server.
+
+        :param gid: ID of the group from which to obtain the rolemappings.
+        :param realm: Realm from which to obtain the rolemappings.
+        :return: The rollemappings of specified group and client of the realm (default "master").
+        """
+        available_rolemappings_url = URL_GROUP_ROLEMAPPINGS_REALM_COMPOSITE.format(url=self.baseurl, realm=realm,
+                                                                                   id=gid)
+        try:
+            return json.loads(to_native(open_url(available_rolemappings_url, method="GET", headers=self.restheaders,
+                                                 validate_certs=self.validate_certs).read()))
+        except Exception as e:
+            self.module.fail_json(msg="Could not fetch composite rolemappings for group %s, realm %s: %s"
+                                      % (gid, realm, str(e)))
+
+    def add_group_realm_rolemapping(self, gid, role_rep, realm="master"):
+        """ Fetch the composite role of the realm in a specified group on the Keycloak server.
+
+        :param gid: ID of the group from which to obtain the rolemappings.
+        :param role_rep: Representation of the role to assign.
+        :param realm: Realm from which to obtain the rolemappings.
+        :return: None.
+        """
+        available_rolemappings_url = URL_GROUP_ROLEMAPPINGS_REALM.format(url=self.baseurl, realm=realm, id=gid)
+        try:
+            open_url(available_rolemappings_url, method="POST", headers=self.restheaders, data=json.dumps(role_rep),
+                     validate_certs=self.validate_certs)
+        except Exception as e:
+            self.module.fail_json(msg="Could not add rolemappings %s for group %s, realm %s: %s"
+                                      % (role_rep, gid, realm, str(e)))
+
+    def delete_group_realm_rolemapping(self, gid, role_rep, realm="master"):
+        """ Delete the rolemapping of the realm in a specified group on the Keycloak server.
+
+        :param gid: ID of the group from which to obtain the rolemappings.
+        :param role_rep: Representation of the role to delete.
+        :param realm: Realm from which to obtain the rolemappings.
+        :return: None.
+        """
+        available_rolemappings_url = URL_GROUP_ROLEMAPPINGS_REALM.format(url=self.baseurl, realm=realm, id=gid)
+        try:
+            open_url(available_rolemappings_url, method="DELETE", headers=self.restheaders,
+                     data=json.dumps(role_rep), validate_certs=self.validate_certs)
+        except Exception as e:
+            self.module.fail_json(msg="Could not delete rolemappings for group %s, realm %s: %s"
+                                      % (gid, realm, str(e)))
+
+    def get_user_realm_rolemapping_by_id(self, uid, rid, realm='master'):
+        """ Obtain client representation by id
+
+        :param uid: ID of the user from which to obtain the rolemappings.
+        :param rid: ID of the role.
+        :param realm: client from this realm
+        :return: dict of rolemapping representation or None if none matching exist
+        """
+        rolemappings_url = URL_USER_ROLEMAPPINGS_REALM.format(url=self.baseurl, realm=realm, id=uid)
+        try:
+            rolemappings = json.loads(to_native(open_url(rolemappings_url, method="GET", headers=self.restheaders,
+                                                         validate_certs=self.validate_certs).read()))
+            for role in rolemappings:
+                if rid == role['id']:
+                    return role
+        except Exception as e:
+            self.module.fail_json(msg="Could not fetch rolemappings for user %s, realm %s: %s"
+                                      % (uid, realm, str(e)))
+        return None
+
+    def get_user_available_realm_rolemappings(self, uid, realm="master"):
+        """ Fetch the available role of the realm in a specified user on the Keycloak server.
+
+        :param uid: ID of the user from which to obtain the rolemappings.
+        :param realm: Realm from which to obtain the rolemappings.
+        :return: The rollemappings of specified group and client of the realm (default "master").
+        """
+        available_rolemappings_url = URL_USER_ROLEMAPPINGS_REALM_AVAILABLE.format(url=self.baseurl, realm=realm,
+                                                                                  id=uid)
+        try:
+            return json.loads(to_native(open_url(available_rolemappings_url, method="GET", headers=self.restheaders,
+                                                 validate_certs=self.validate_certs).read()))
+        except Exception as e:
+            self.module.fail_json(msg="Could not fetch available rolemappings for user %s, realm %s: %s"
+                                      % (uid, realm, str(e)))
+
+    def get_user_composite_realm_rolemappings(self, uid, realm="master"):
+        """ Fetch the composite role of the realm in a specified user on the Keycloak server.
+
+        :param uid: ID of the user from which to obtain the rolemappings.
+        :param realm: Realm from which to obtain the rolemappings.
+        :return: The rollemappings of specified group and client of the realm (default "master").
+        """
+        available_rolemappings_url = URL_USER_ROLEMAPPINGS_REALM_COMPOSITE.format(url=self.baseurl, realm=realm,
+                                                                                  id=uid)
+        try:
+            return json.loads(to_native(open_url(available_rolemappings_url, method="GET", headers=self.restheaders,
+                                                 validate_certs=self.validate_certs).read()))
+        except Exception as e:
+            self.module.fail_json(msg="Could not fetch composite rolemappings for user %s, realm %s: %s"
+                                      % (uid, realm, str(e)))
+
+    def add_user_realm_rolemapping(self, uid, role_rep, realm="master"):
+        """ Fetch the composite role of the realm in a specified user on the Keycloak server.
+
+        :param uid: ID of the user from which to obtain the rolemappings.
+        :param role_rep: Representation of the role to assign.
+        :param realm: Realm from which to obtain the rolemappings.
+        :return: None.
+        """
+        available_rolemappings_url = URL_USER_ROLEMAPPINGS_REALM.format(url=self.baseurl, realm=realm, id=uid)
+        try:
+            open_url(available_rolemappings_url, method="POST", headers=self.restheaders, data=json.dumps(role_rep),
+                     validate_certs=self.validate_certs)
+        except Exception as e:
+            self.module.fail_json(msg="Could not add rolemappings for user %s, realm %s: %s"
+                                      % (uid, realm, str(e)))
+
+    def delete_user_realm_rolemapping(self, uid, role_rep, realm="master"):
+        """ Delete the rolemapping of the realm in a specified user on the Keycloak server.
+
+        :param uid: ID of the user from which to obtain the rolemappings.
+        :param role_rep: Representation of the role to delete.
+        :param realm: Realm from which to obtain the rolemappings.
+        :return: None.
+        """
+        available_rolemappings_url = URL_USER_ROLEMAPPINGS_REALM.format(url=self.baseurl, realm=realm, id=uid)
+        try:
+            open_url(available_rolemappings_url, method="DELETE", headers=self.restheaders,
+                     data=json.dumps(role_rep), validate_certs=self.validate_certs)
+        except Exception as e:
+            self.module.fail_json(msg="Could not delete rolemappings for user %s, realm %s: %s"
+                                      % (uid, realm, str(e)))
 
     def get_client_templates(self, realm='master'):
         """ Obtains client template representations for client templates in a realm
@@ -989,7 +1288,7 @@ class KeycloakAPI(object):
 
         return realm_roles
 
-    def get_clientscope_realm_available_scopemappings(self, cid, realm="master"):
+    def get_clientscope_available_realm_scopemappings(self, cid, realm="master"):
         scopemappings_realm_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM_AVAILABLE.format(url=self.baseurl, realm=realm,
                                                                                        id=cid)
 
@@ -1003,7 +1302,7 @@ class KeycloakAPI(object):
 
         return realm_roles
 
-    def get_clientscope_realm_composite_scopemappings(self, cid, realm="master"):
+    def get_clientscope_composite_realm_scopemappings(self, cid, realm="master"):
         scopemappings_realm_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM_COMPOSITE.format(url=self.baseurl, realm=realm,
                                                                                        id=cid)
 
@@ -1080,7 +1379,7 @@ class KeycloakAPI(object):
 
         return client_roles
 
-    def get_clientscope_client_available_scopemappings(self, csid, cid, realm="master"):
+    def get_clientscope_available_client_scopemappings(self, csid, cid, realm="master"):
         scopemappings_client_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_CLIENT_AVAILABLE.format(url=self.baseurl, realm=realm,
                                                                                          id=csid,
                                                                                          client_id=cid)
@@ -1096,7 +1395,7 @@ class KeycloakAPI(object):
 
         return client_roles
 
-    def get_clientscope_client_composite_scopemappings(self, csid, cid, realm="master"):
+    def get_clientscope_composite_client_scopemappings(self, csid, cid, realm="master"):
         scopemappings_client_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_CLIENT_COMPOSITE.format(url=self.baseurl, realm=realm,
                                                                                          id=csid,
                                                                                          client_id=cid)
@@ -1209,6 +1508,68 @@ class KeycloakAPI(object):
         except Exception as e:
             self.module.fail_json(msg="Could not fetch group %s in realm %s: %s"
                                       % (name, realm, str(e)))
+
+    def get_users(self, realm="master"):
+        """ Fetch the name and ID of all users on the Keycloak server.
+
+        :param realm: Return the users of this realm (default "master").
+        :param kwargs: Query parameters
+        """
+        users_url = URL_USERS.format(url=self.baseurl, realm=realm)
+        try:
+            return json.loads(to_native(open_url(users_url, method="GET", headers=self.restheaders,
+                                                 validate_certs=self.validate_certs).read()))
+        except Exception as e:
+            self.module.fail_json(msg="Could not fetch list of users in realm %s: %s"
+                                      % (realm, str(e)))
+
+    def get_user_by_userid(self, uid, realm="master"):
+        """ Fetch a keycloak user from the provided realm using the user's unique ID.
+
+        If the group does not exist, None is returned.
+
+        uid is a UUID provided by the Keycloak API
+        :param uid: UUID of the group to be returned
+        :param realm: Realm in which the group resides; default 'master'.
+        """
+        users_url = URL_USER.format(url=self.baseurl, realm=realm, user_id=uid)
+        try:
+            return json.loads(to_native(open_url(users_url, method="GET", headers=self.restheaders,
+                                                 validate_certs=self.validate_certs).read()))
+
+        except HTTPError as e:
+            if e.code == 404:
+                return None
+            else:
+                self.module.fail_json(msg="Could not fetch user %s in realm %s: %s"
+                                          % (uid, realm, str(e)))
+        except Exception as e:
+            self.module.fail_json(msg="Could not fetch user %s in realm %s: %s"
+                                      % (uid, realm, str(e)))
+
+    def get_user_by_name(self, username, realm="master"):
+        """ Fetch a keycloak user within a realm based on its name.
+
+        The Keycloak API does not allow filtering of the Users resource by name.
+        As a result, this method first retrieves the entire list of users - name and ID -
+        then performs a second query to fetch the group.
+
+        If the group does not exist, None is returned.
+        :param username: Name of the group to fetch.
+        :param realm: Realm in which the group resides; default 'master'
+        """
+        try:
+            all_users = self.get_users(realm=realm)
+
+            for user in all_users:
+                if user['username'] == username:
+                    return self.get_user_by_userid(user['id'], realm=realm)
+
+            return None
+
+        except Exception as e:
+            self.module.fail_json(msg="Could not fetch user %s in realm %s: %s"
+                                      % (username, realm, str(e)))
 
     def create_group(self, grouprep, realm="master"):
         """ Create a Keycloak group.
