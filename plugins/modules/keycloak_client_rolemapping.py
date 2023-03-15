@@ -1,11 +1,10 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) Ansible project
-# GNU General Public License v3.0+ (see LICENSES/GPL-3.0-or-later.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
-# SPDX-License-Identifier: GPL-3.0-or-later
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
+
 __metaclass__ = type
 
 DOCUMENTATION = '''
@@ -51,6 +50,12 @@ options:
             - present
             - absent
 
+    force:
+        type: bool
+        description:
+            - Force override of scope mapping
+        default: False
+    
     realm:
         type: str
         description:
@@ -61,7 +66,7 @@ options:
         type: str
         description:
             - Name of the group to be mapped.
-            - This parameter is required (can be replaced by gid for less API call).
+            - This parameter is required (can be replaced by gid for less API call) if user_name and uid are missing
 
     gid:
         type: str
@@ -70,6 +75,19 @@ options:
             - This parameter is not required for updating or deleting the rolemapping but
               providing it will reduce the number of API calls required.
 
+    user_name:
+        type: str
+        description:
+            - Name of the user to be mapped.
+            - This parameter is required (can ben replaced by uid for less API call) if group_name and gid are missing
+    
+    uid:
+        type: str
+        description:
+            - Id of the user to be mapped.
+            - This parameter is not required for updating or deleting the rolemapping bug
+              providing it will reduce the number of API calls required.
+            
     client_id:
         type: str
         description:
@@ -102,16 +120,17 @@ options:
                       providing it will reduce the number of API calls required.
 
 extends_documentation_fragment:
-    - community.general.keycloak
-    - community.general.attributes
+- community.general.keycloak
+
 
 author:
     - Gaëtan Daubresse (@Gaetan2907)
+    - Francesco Fiore (@ffiore)
 '''
 
 EXAMPLES = '''
 - name: Map a client role to a group, authentication with credentials
-  community.general.keycloak_client_rolemapping:
+  community.general.keycloak_client_rolemappings:
     realm: MyCustomRealm
     auth_client_id: admin-cli
     auth_keycloak_url: https://auth.example.com/auth
@@ -128,8 +147,26 @@ EXAMPLES = '''
         id: role_id2
   delegate_to: localhost
 
+- name: Map a client role to a user, authentication with credentials
+  community.general.keycloak_client_rolemappings:
+    realm: MyCustomRealm
+    auth_client_id: admin-cli
+    auth_keycloak_url: https://auth.example.com/auth
+    auth_realm: master
+    auth_username: USERNAME
+    auth_password: PASSWORD
+    state: present
+    client_id: client1
+    user_name: user.name1
+    roles:
+      - name: role_name1
+        id: role_id1
+      - name: role_name2
+        id: role_id2
+  delegate_to: localhost
+  
 - name: Map a client role to a group, authentication with token
-  community.general.keycloak_client_rolemapping:
+  community.general.keycloak_client_rolemappings:
     realm: MyCustomRealm
     auth_client_id: admin-cli
     auth_keycloak_url: https://auth.example.com/auth
@@ -145,7 +182,7 @@ EXAMPLES = '''
   delegate_to: localhost
 
 - name: Unmap client role from a group
-  community.general.keycloak_client_rolemapping:
+  community.general.keycloak_client_rolemappings:
     realm: MyCustomRealm
     auth_client_id: admin-cli
     auth_keycloak_url: https://auth.example.com/auth
@@ -166,13 +203,13 @@ EXAMPLES = '''
 
 RETURN = '''
 msg:
-    description: Message as to what action was taken.
-    returned: always
-    type: str
-    sample: "Role role1 assigned to group group1."
+  description: Message as to what action was taken
+  returned: always
+  type: str
+  sample: "Role role1 assigned to group group1."
 
 proposed:
-    description: Representation of proposed client role mapping.
+    description: role_representation representation of proposed changes to client_rolemapping.
     returned: always
     type: dict
     sample: {
@@ -181,7 +218,7 @@ proposed:
 
 existing:
     description:
-      - Representation of existing client role mapping.
+      - role_representation representation of existing role_representation.
       - The sample is truncated.
     returned: always
     type: dict
@@ -191,12 +228,11 @@ existing:
             "request.object.signature.alg": "RS256",
         }
     }
-
 end_state:
     description:
-      - Representation of client role mapping after module execution.
+      - role_representation representation of role_representation after module execution.
       - The sample is truncated.
-    returned: on success
+    returned: always
     type: dict
     sample: {
         "adminUrl": "http://www.example.com/admin_url",
@@ -206,9 +242,8 @@ end_state:
     }
 '''
 
-from ansible_collections.community.general.plugins.module_utils.identity.keycloak.keycloak import (
-    KeycloakAPI, keycloak_argument_spec, get_token, KeycloakError,
-)
+from ansible_collections.community.general.plugins.module_utils.identity.keycloak.keycloak import KeycloakAPI, \
+    keycloak_argument_spec, get_token, KeycloakError
 from ansible.module_utils.basic import AnsibleModule
 
 
@@ -230,9 +265,12 @@ def main():
         realm=dict(default='master'),
         gid=dict(type='str'),
         group_name=dict(type='str'),
+        uid=dict(type='str'),
+        user_name=dict(type='str'),
         cid=dict(type='str'),
         client_id=dict(type='str'),
         roles=dict(type='list', elements='dict', options=roles_spec),
+        force=dict(type='bool', default=False)
     )
 
     argument_spec.update(meta_args)
@@ -258,25 +296,42 @@ def main():
     client_id = module.params.get('client_id')
     gid = module.params.get('gid')
     group_name = module.params.get('group_name')
+    uid = module.params.get('uid')
+    user_name = module.params.get('user_name')
     roles = module.params.get('roles')
+    force = module.params.get('force')
 
     # Check the parameters
     if cid is None and client_id is None:
         module.fail_json(msg='Either the `client_id` or `cid` has to be specified.')
-    if gid is None and group_name is None:
-        module.fail_json(msg='Either the `group_name` or `gid` has to be specified.')
+    if gid is None and group_name is None and uid is None and user_name is None:
+        module.fail_json(msg='Either the `group_name` or `gid` or `user_name` or `uid` has to be specified.')
+
+    if (gid or group_name) and (uid or user_name):
+        module.fail_json(msg='Both `group_name/gid` and `user_name/uid` has been specified')
 
     # Get the potential missing parameters
-    if gid is None:
+    if gid is None and group_name:
         group_rep = kc.get_group_by_name(group_name, realm=realm)
         if group_rep is not None:
             gid = group_rep['id']
         else:
-            module.fail_json(msg='Could not fetch group %s:' % group_name)
+            module.fail_json(msg='Could not fetch group %s' % group_name)
+    elif gid:
+        group_name = kc.get_group_by_groupid(gid, realm=realm)
+    elif uid is None and user_name:
+        user_rep = kc.get_user_by_name(user_name, realm=realm)
+        if user_rep is not None:
+            uid = user_rep['id']
+        else:
+            module.fail_json(msg='Could not fetch user %s' % user_name)
+    elif uid:
+        user_name = kc.get_user_by_userid(uid, realm=realm)
+
     if cid is None:
         cid = kc.get_client_id(client_id, realm=realm)
         if cid is None:
-            module.fail_json(msg='Could not fetch client %s:' % client_id)
+            module.fail_json(msg='Could not fetch client %s' % client_id)
     if roles is None:
         module.exit_json(msg="Nothing to do (no roles specified).")
     else:
@@ -285,25 +340,30 @@ def main():
                 module.fail_json(msg='Either the `name` or `id` has to be specified on each role.')
             # Fetch missing role_id
             if role['id'] is None:
-                role_id = kc.get_client_role_id_by_name(cid, role['name'], realm=realm)
+                role_id = kc.get_client_role_by_name(gid, cid, role['name'], realm=realm)
                 if role_id is not None:
                     role['id'] = role_id
                 else:
                     module.fail_json(msg='Could not fetch role %s:' % (role['name']))
             # Fetch missing role_name
             else:
-                role['name'] = kc.get_client_group_rolemapping_by_id(gid, cid, role['id'], realm=realm)['name']
+                role['name'] = kc.get_client_role_by_id(cid, role['id'], realm=realm)['name']
                 if role['name'] is None:
                     module.fail_json(msg='Could not fetch role %s' % (role['id']))
 
     # Get effective client-level role mappings
-    available_roles_before = kc.get_client_group_available_rolemappings(gid, cid, realm=realm)
-    assigned_roles_before = kc.get_client_group_composite_rolemappings(gid, cid, realm=realm)
+    if gid:
+        available_roles_before = kc.get_group_available_client_rolemappings(gid, cid, realm=realm)
+        assigned_roles_before = kc.get_group_composite_client_rolemappings(gid, cid, realm=realm)
+    else:
+        available_roles_before = kc.get_user_available_client_rolemappings(uid, cid, realm=realm)
+        assigned_roles_before = kc.get_user_composite_client_rolemappings(uid, cid, realm=realm)
 
     result['existing'] = assigned_roles_before
-    result['proposed'] = list(assigned_roles_before) if assigned_roles_before else []
+    result['proposed'] = roles
 
     update_roles = []
+    delete_roles = []
     for role_index, role in enumerate(roles, start=0):
         # Fetch roles to assign if state present
         if state == 'present':
@@ -313,7 +373,6 @@ def main():
                         'id': role['id'],
                         'name': role['name'],
                     })
-                    result['proposed'].append(available_role)
         # Fetch roles to remove if state absent
         else:
             for assigned_role in assigned_roles_before:
@@ -322,38 +381,61 @@ def main():
                         'id': role['id'],
                         'name': role['name'],
                     })
-                    if assigned_role in result['proposed']:  # Handle double removal
-                        result['proposed'].remove(assigned_role)
 
-    if len(update_roles):
+    if state == 'present' and force:
+        required_roles = [role['name'] for role in roles]
+        for role in assigned_roles_before:
+            if role['name'] not in required_roles:
+                delete_roles.append({
+                    'id': role['id'],
+                    'name': role['name']
+                })
+
+    if len(update_roles) or len(delete_roles):
         if state == 'present':
             # Assign roles
             result['changed'] = True
             if module._diff:
-                result['diff'] = dict(before=assigned_roles_before, after=result['proposed'])
+                result['diff'] = dict(before=assigned_roles_before, after=update_roles)
             if module.check_mode:
                 module.exit_json(**result)
-            kc.add_group_rolemapping(gid, cid, update_roles, realm=realm)
-            result['msg'] = 'Roles %s assigned to group %s.' % (update_roles, group_name)
-            assigned_roles_after = kc.get_client_group_composite_rolemappings(gid, cid, realm=realm)
+            if gid:
+                if len(update_roles):
+                    kc.add_group_client_rolemapping(gid, cid, update_roles, realm=realm)
+                if len(delete_roles):
+                    kc.delete_group_client_rolemapping(gid, cid, delete_roles, realm=realm)
+                result['msg'] = 'Roles %s assigned to group %s.' % (update_roles, group_name)
+                assigned_roles_after = kc.get_group_composite_client_rolemappings(gid, cid, realm=realm)
+            else:
+                if len(update_roles):
+                    kc.add_user_client_rolemapping(uid, cid, update_roles, realm=realm)
+                if len(delete_roles):
+                    kc.delete_user_client_rolemapping(uid, cid, delete_roles, realm=realm)
+                result['msg'] = 'Roles %s assigned to user %s.' % (update_roles, user_name)
+                assigned_roles_after = kc.get_user_composite_client_rolemappings(uid, cid, realm=realm)
             result['end_state'] = assigned_roles_after
             module.exit_json(**result)
         else:
             # Remove mapping of role
             result['changed'] = True
             if module._diff:
-                result['diff'] = dict(before=assigned_roles_before, after=result['proposed'])
+                result['diff'] = dict(before=assigned_roles_before, after=update_roles)
             if module.check_mode:
                 module.exit_json(**result)
-            kc.delete_group_rolemapping(gid, cid, update_roles, realm=realm)
-            result['msg'] = 'Roles %s removed from group %s.' % (update_roles, group_name)
-            assigned_roles_after = kc.get_client_group_composite_rolemappings(gid, cid, realm=realm)
+            if gid:
+                kc.delete_group_client_rolemapping(gid, cid, update_roles, realm=realm)
+                result['msg'] = 'Roles %s removed from group %s.' % (update_roles, group_name)
+                assigned_roles_after = kc.get_group_composite_client_rolemappings(gid, cid, realm=realm)
+            else:
+                kc.delete_user_client_rolemapping(uid, cid, update_roles, realm=realm)
+                result['msg'] = 'Roles %s removed from user %s. ' % (update_roles, user_name)
+                assigned_roles_after = kc.get_user_composite_client_rolemappings(uid, cid, realm=realm)
             result['end_state'] = assigned_roles_after
             module.exit_json(**result)
     # Do nothing
     else:
         result['changed'] = False
-        result['msg'] = 'Nothing to do, roles %s are %s with group %s.' % (roles, 'mapped' if state == 'present' else 'not mapped', group_name)
+        result['msg'] = 'Nothing to do, roles %s are correctly mapped with group %s.' % (roles, group_name)
         module.exit_json(**result)
 
 
