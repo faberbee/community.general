@@ -44,9 +44,6 @@ URL_GROUPS = "{url}/admin/realms/{realm}/groups"
 URL_GROUP = "{url}/admin/realms/{realm}/groups/{groupid}"
 URL_GROUP_CHILDREN = "{url}/admin/realms/{realm}/groups/{groupid}/children"
 
-URL_USERS = "{url}/admin/realms/{realm}/users"
-URL_USER = "{url}/admin/realms/{realm}/users/{user_id}"
-
 URL_CLIENTSCOPES = "{url}/admin/realms/{realm}/client-scopes"
 URL_CLIENTSCOPE = "{url}/admin/realms/{realm}/client-scopes/{id}"
 URL_CLIENTSCOPE_PROTOCOLMAPPERS = "{url}/admin/realms/{realm}/client-scopes/{id}/protocol-mappers/models"
@@ -66,7 +63,15 @@ URL_CLIENT_GROUP_ROLEMAPPINGS = "{url}/admin/realms/{realm}/groups/{id}/role-map
 URL_CLIENT_GROUP_ROLEMAPPINGS_AVAILABLE = "{url}/admin/realms/{realm}/groups/{id}/role-mappings/clients/{client}/available"
 URL_CLIENT_GROUP_ROLEMAPPINGS_COMPOSITE = "{url}/admin/realms/{realm}/groups/{id}/role-mappings/clients/{client}/composite"
 
+URL_REALM_GROUP_ROLEMAPPINGS = "{url}/admin/realms/{realm}/groups/{id}/role-mappings/realm"
+URL_REALM_GROUP_ROLEMAPPINGS_AVAILABLE = "{url}/admin/realms/{realm}/groups/{id}/role-mappings/realm/available"
+URL_REALM_GROUP_ROLEMAPPINGS_COMPOSITE = "{url}/admin/realms/{realm}/groups/{id}/role-mappings/realm/composite"
+
+URL_CLIENT_DEFAULTCLIENTSCOPES = "{url}/admin/realms/{realm}/clients/{id}/default-client-scopes"
+URL_CLIENT_DEFAULTCLIENTSCOPE = "{url}/admin/realms/{realm}/clients/{id}/default-client-scopes/{client_scope_id}"
+
 URL_USERS = "{url}/admin/realms/{realm}/users"
+URL_USER = "{url}/admin/realms/{realm}/users/{user_id}"
 URL_CLIENT_SERVICE_ACCOUNT_USER = "{url}/admin/realms/{realm}/clients/{id}/service-account-user"
 URL_CLIENT_USER_ROLEMAPPINGS = "{url}/admin/realms/{realm}/users/{id}/role-mappings/clients/{client}"
 URL_CLIENT_USER_ROLEMAPPINGS_AVAILABLE = "{url}/admin/realms/{realm}/users/{id}/role-mappings/clients/{client}/available"
@@ -497,7 +502,7 @@ class KeycloakAPI(object):
         :return: User representation of the service account user
         """
 
-        service_account_user_url = URL_CLIENT_SERVICEACCOUNT.format(url=self.baseurl, realm=realm, id=cid)
+        service_account_user_url = URL_CLIENT_SERVICE_ACCOUNT_USER.format(url=self.baseurl, realm=realm, id=cid)
 
         try:
             return json.loads(to_native(open_url(service_account_user_url, method="GET", headers=self.restheaders,
@@ -715,7 +720,7 @@ class KeycloakAPI(object):
         :param realm: client from this realm
         :return: dict of rolemapping representation or None if none matching exist
         """
-        rolemappings_url = URL_USER_ROLEMAPPINGS_CLIENT.format(url=self.baseurl, realm=realm, id=uid, client=cid)
+        rolemappings_url = URL_CLIENT_USER_ROLEMAPPINGS.format(url=self.baseurl, realm=realm, id=uid, client=cid)
         try:
             rolemappings = json.loads(to_native(open_url(rolemappings_url, method="GET", headers=self.restheaders,
                                                          validate_certs=self.validate_certs).read()))
@@ -735,7 +740,7 @@ class KeycloakAPI(object):
         :param realm: Realm from which to obtain the rolemappings.
         :return: The rollemappings of specified group and client of the realm (default "master").
         """
-        available_rolemappings_url = URL_USER_ROLEMAPPINGS_CLIENT_AVAILABLE.format(url=self.baseurl, realm=realm,
+        available_rolemappings_url = URL_CLIENT_USER_ROLEMAPPINGS_AVAILABLE.format(url=self.baseurl, realm=realm,
                                                                                    id=uid,
                                                                                    client=cid)
         try:
@@ -753,7 +758,7 @@ class KeycloakAPI(object):
         :param realm: Realm from which to obtain the rolemappings.
         :return: The rollemappings of specified group and client of the realm (default "master").
         """
-        available_rolemappings_url = URL_USER_ROLEMAPPINGS_CLIENT_COMPOSITE.format(url=self.baseurl, realm=realm,
+        available_rolemappings_url = URL_CLIENT_USER_ROLEMAPPINGS_COMPOSITE.format(url=self.baseurl, realm=realm,
                                                                                    id=uid,
                                                                                    client=cid)
         try:
@@ -772,7 +777,7 @@ class KeycloakAPI(object):
         :param realm: Realm from which to obtain the rolemappings.
         :return: None.
         """
-        available_rolemappings_url = URL_USER_ROLEMAPPINGS_CLIENT.format(url=self.baseurl, realm=realm, id=uid,
+        available_rolemappings_url = URL_CLIENT_USER_ROLEMAPPINGS.format(url=self.baseurl, realm=realm, id=uid,
                                                                          client=cid)
         try:
             open_url(available_rolemappings_url, method="POST", headers=self.restheaders, data=json.dumps(role_rep),
@@ -790,7 +795,7 @@ class KeycloakAPI(object):
         :param realm: Realm from which to obtain the rolemappings.
         :return: None.
         """
-        available_rolemappings_url = URL_USER_ROLEMAPPINGS_CLIENT.format(url=self.baseurl, realm=realm, id=uid,
+        available_rolemappings_url = URL_CLIENT_USER_ROLEMAPPINGS.format(url=self.baseurl, realm=realm, id=uid,
                                                                          client=cid)
         try:
             open_url(available_rolemappings_url, method="DELETE", headers=self.restheaders,
@@ -807,7 +812,7 @@ class KeycloakAPI(object):
         :param realm: client from this realm
         :return: dict of rolemapping representation or None if none matching exist
         """
-        rolemappings_url = URL_GROUP_ROLEMAPPINGS_REALM.format(url=self.baseurl, realm=realm, id=gid, client=cid)
+        rolemappings_url = URL_REALM_GROUP_ROLEMAPPINGS.format(url=self.baseurl, realm=realm, id=gid)
         try:
             rolemappings = json.loads(to_native(open_url(rolemappings_url, method="GET", headers=self.restheaders,
                                                          validate_certs=self.validate_certs).read()))
@@ -826,7 +831,7 @@ class KeycloakAPI(object):
         :param realm: Realm from which to obtain the rolemappings.
         :return: The rollemappings of specified group and client of the realm (default "master").
         """
-        available_rolemappings_url = URL_GROUP_ROLEMAPPINGS_REALM_AVAILABLE.format(url=self.baseurl, realm=realm,
+        available_rolemappings_url = URL_REALM_GROUP_ROLEMAPPINGS_AVAILABLE.format(url=self.baseurl, realm=realm,
                                                                                    id=gid)
         try:
             return json.loads(to_native(open_url(available_rolemappings_url, method="GET", headers=self.restheaders,
@@ -842,7 +847,7 @@ class KeycloakAPI(object):
         :param realm: Realm from which to obtain the rolemappings.
         :return: The rollemappings of specified group and client of the realm (default "master").
         """
-        available_rolemappings_url = URL_GROUP_ROLEMAPPINGS_REALM_COMPOSITE.format(url=self.baseurl, realm=realm,
+        available_rolemappings_url = URL_REALM_GROUP_ROLEMAPPINGS_COMPOSITE.format(url=self.baseurl, realm=realm,
                                                                                    id=gid)
         try:
             return json.loads(to_native(open_url(available_rolemappings_url, method="GET", headers=self.restheaders,
@@ -859,7 +864,7 @@ class KeycloakAPI(object):
         :param realm: Realm from which to obtain the rolemappings.
         :return: None.
         """
-        available_rolemappings_url = URL_GROUP_ROLEMAPPINGS_REALM.format(url=self.baseurl, realm=realm, id=gid)
+        available_rolemappings_url = URL_REALM_GROUP_ROLEMAPPINGS.format(url=self.baseurl, realm=realm, id=gid)
         try:
             open_url(available_rolemappings_url, method="POST", headers=self.restheaders, data=json.dumps(role_rep),
                      validate_certs=self.validate_certs)
@@ -875,7 +880,7 @@ class KeycloakAPI(object):
         :param realm: Realm from which to obtain the rolemappings.
         :return: None.
         """
-        available_rolemappings_url = URL_GROUP_ROLEMAPPINGS_REALM.format(url=self.baseurl, realm=realm, id=gid)
+        available_rolemappings_url = URL_REALM_GROUP_ROLEMAPPINGS.format(url=self.baseurl, realm=realm, id=gid)
         try:
             open_url(available_rolemappings_url, method="DELETE", headers=self.restheaders,
                      data=json.dumps(role_rep), validate_certs=self.validate_certs)
@@ -891,7 +896,7 @@ class KeycloakAPI(object):
         :param realm: client from this realm
         :return: dict of rolemapping representation or None if none matching exist
         """
-        rolemappings_url = URL_USER_ROLEMAPPINGS_REALM.format(url=self.baseurl, realm=realm, id=uid)
+        rolemappings_url = URL_REALM_ROLEMAPPINGS.format(url=self.baseurl, realm=realm, id=uid)
         try:
             rolemappings = json.loads(to_native(open_url(rolemappings_url, method="GET", headers=self.restheaders,
                                                          validate_certs=self.validate_certs).read()))
@@ -910,7 +915,7 @@ class KeycloakAPI(object):
         :param realm: Realm from which to obtain the rolemappings.
         :return: The rollemappings of specified group and client of the realm (default "master").
         """
-        available_rolemappings_url = URL_USER_ROLEMAPPINGS_REALM_AVAILABLE.format(url=self.baseurl, realm=realm,
+        available_rolemappings_url = URL_REALM_ROLEMAPPINGS_AVAILABLE.format(url=self.baseurl, realm=realm,
                                                                                   id=uid)
         try:
             return json.loads(to_native(open_url(available_rolemappings_url, method="GET", headers=self.restheaders,
@@ -926,7 +931,7 @@ class KeycloakAPI(object):
         :param realm: Realm from which to obtain the rolemappings.
         :return: The rollemappings of specified group and client of the realm (default "master").
         """
-        available_rolemappings_url = URL_USER_ROLEMAPPINGS_REALM_COMPOSITE.format(url=self.baseurl, realm=realm,
+        available_rolemappings_url = URL_REALM_ROLEMAPPINGS_COMPOSITE.format(url=self.baseurl, realm=realm,
                                                                                   id=uid)
         try:
             return json.loads(to_native(open_url(available_rolemappings_url, method="GET", headers=self.restheaders,
@@ -943,7 +948,7 @@ class KeycloakAPI(object):
         :param realm: Realm from which to obtain the rolemappings.
         :return: None.
         """
-        available_rolemappings_url = URL_USER_ROLEMAPPINGS_REALM.format(url=self.baseurl, realm=realm, id=uid)
+        available_rolemappings_url = URL_REALM_ROLEMAPPINGS.format(url=self.baseurl, realm=realm, id=uid)
         try:
             open_url(available_rolemappings_url, method="POST", headers=self.restheaders, data=json.dumps(role_rep),
                      validate_certs=self.validate_certs)
@@ -959,7 +964,7 @@ class KeycloakAPI(object):
         :param realm: Realm from which to obtain the rolemappings.
         :return: None.
         """
-        available_rolemappings_url = URL_USER_ROLEMAPPINGS_REALM.format(url=self.baseurl, realm=realm, id=uid)
+        available_rolemappings_url = URL_REALM_ROLEMAPPINGS.format(url=self.baseurl, realm=realm, id=uid)
         try:
             open_url(available_rolemappings_url, method="DELETE", headers=self.restheaders,
                      data=json.dumps(role_rep), validate_certs=self.validate_certs)
