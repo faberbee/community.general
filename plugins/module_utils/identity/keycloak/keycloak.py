@@ -1422,6 +1422,191 @@ class KeycloakAPI(object):
             self.module.fail_json(msg='Could not update protocolmappers for clientscope %s in realm %s: %s'
                                       % (mapper_rep, realm, str(e)))
 
+    def create_clientscope_realm_scopemappings(self, cid, roles, realm="master"):
+        scopemappings_realm_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM.format(url=self.baseurl, realm=realm, id=cid)
+
+        realm_roles = []
+        for role_name in roles:
+            role = self.get_realm_role(name=role_name, realm=realm)
+            realm_roles.append({'id': role['id']})
+
+        try:
+            return open_url(scopemappings_realm_url, method='POST', headers=self.restheaders,
+                            data=json.dumps(realm_roles), validate_certs=self.validate_certs)
+
+        except Exception as e:
+            self.module.fail_json(msg='Could not create realm scopemappings for clientscope %s in realm %s: %s'
+                                      % (cid, realm, str(e)))
+
+    def get_clientscope_realm_scopemappings(self, cid, realm="master"):
+        scopemappings_realm_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM.format(url=self.baseurl, realm=realm, id=cid)
+
+        try:
+            realm_roles = json.loads(to_native(open_url(scopemappings_realm_url, method='GET', headers=self.restheaders,
+                                                        validate_certs=self.validate_certs).read()))
+
+        except Exception as e:
+            self.module.fail_json(msg='Could not get realm scopemappings for clientscope %s in realm %s: %s'
+                                      % (cid, realm, str(e)))
+
+        return realm_roles
+
+    def get_clientscope_available_realm_scopemappings(self, cid, realm="master"):
+        scopemappings_realm_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM_AVAILABLE.format(url=self.baseurl, realm=realm,
+                                                                                       id=cid)
+
+        try:
+            realm_roles = json.loads(to_native(open_url(scopemappings_realm_url, method='GET', headers=self.restheaders,
+                                                        validate_certs=self.validate_certs).read()))
+
+        except Exception as e:
+            self.module.fail_json(msg='Could not get realm scopemappings for clientscope %s in realm %s: %s'
+                                      % (cid, realm, str(e)))
+
+        return realm_roles
+
+    def get_clientscope_composite_realm_scopemappings(self, cid, realm="master"):
+        scopemappings_realm_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM_COMPOSITE.format(url=self.baseurl, realm=realm,
+                                                                                       id=cid)
+
+        try:
+            realm_roles = json.loads(to_native(open_url(scopemappings_realm_url, method='GET', headers=self.restheaders,
+                                                        validate_certs=self.validate_certs).read()))
+
+        except Exception as e:
+            self.module.fail_json(msg='Could not get realm scopemappings for clientscope %s in realm %s: %s'
+                                      % (cid, realm, str(e)))
+
+        return realm_roles
+
+    def get_clientscope_realm_scopemapping_by_id(self, cid, role_id, realm="master"):
+        scopemappings_realm_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM.format(url=self.baseurl, realm=realm, id=cid)
+
+        try:
+            realm_roles = json.loads(to_native(open_url(scopemappings_realm_url, method='GET', headers=self.restheaders,
+                                                        validate_certs=self.validate_certs).read()))
+
+            for role in realm_roles:
+                if role['id'] == role_id:
+                    return role
+
+        except Exception as e:
+            self.module.fail_json(msg='Could not get realm scopemapping for clientscope %s in realm %s: %s'
+                                      % (cid, realm, str(e)))
+
+        return None
+
+    def delete_clientscope_realm_scopemappings(self, cid, roles, realm="master"):
+        scopemappings_realm_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_REALM.format(url=self.baseurl, realm=realm, id=cid)
+
+        realm_roles = []
+        for role_name in roles:
+            role = self.get_realm_role(name=role_name, realm=realm)
+            realm_roles.append({'id': role['id']})
+
+        try:
+            return open_url(scopemappings_realm_url, method='DELETE', headers=self.restheaders,
+                            data=json.dumps(realm_roles), validate_certs=self.validate_certs)
+
+        except Exception as e:
+            self.module.fail_json(msg='Could not delete realm scopemappings for clientscope %s in realm %s: %s'
+                                      % (cid, realm, str(e)))
+
+    def create_clientscope_client_scopemappings(self, csid, cid, roles, realm="master"):
+        scopemappings_client_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_CLIENT.format(url=self.baseurl, realm=realm, id=csid,
+                                                                               client_id=cid)
+
+        client_roles = [{"name": x} for x in roles]
+
+        try:
+            return open_url(scopemappings_client_url, method='POST', headers=self.restheaders,
+                            data=json.dumps(client_roles), validate_certs=self.validate_certs)
+
+        except Exception as e:
+            self.module.fail_json(
+                msg='Could not create client scopemappings for clientscope %s in realm %s and client %s: %s'
+                    % (csid, realm, cid, str(e)))
+
+    def get_clientscope_client_scopemappings(self, csid, cid, realm="master"):
+        scopemappings_client_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_CLIENT.format(url=self.baseurl, realm=realm, id=csid,
+                                                                               client_id=cid)
+        try:
+            client_roles = json.loads(
+                to_native(open_url(scopemappings_client_url, method='GET', headers=self.restheaders,
+                                   validate_certs=self.validate_certs).read()))
+
+        except Exception as e:
+            self.module.fail_json(
+                msg='Could not get client scopemappings for clientscope %s in realm %s and client %s: %s'
+                    % (csid, realm, cid, str(e)))
+
+        return client_roles
+
+    def get_clientscope_available_client_scopemappings(self, csid, cid, realm="master"):
+        scopemappings_client_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_CLIENT_AVAILABLE.format(url=self.baseurl, realm=realm,
+                                                                                         id=csid,
+                                                                                         client_id=cid)
+        try:
+            client_roles = json.loads(
+                to_native(open_url(scopemappings_client_url, method='GET', headers=self.restheaders,
+                                   validate_certs=self.validate_certs).read()))
+
+        except Exception as e:
+            self.module.fail_json(
+                msg='Could not get available client scopemappings for clientscope %s in realm %s and client %s: %s'
+                    % (csid, realm, cid, str(e)))
+
+        return client_roles
+
+    def get_clientscope_composite_client_scopemappings(self, csid, cid, realm="master"):
+        scopemappings_client_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_CLIENT_COMPOSITE.format(url=self.baseurl, realm=realm,
+                                                                                         id=csid,
+                                                                                         client_id=cid)
+        try:
+            client_roles = json.loads(
+                to_native(open_url(scopemappings_client_url, method='GET', headers=self.restheaders,
+                                   validate_certs=self.validate_certs).read()))
+
+        except Exception as e:
+            self.module.fail_json(
+                msg='Could not get composite client scopemappings for clientscope %s in realm %s and client %s: %s'
+                    % (csid, realm, cid, str(e)))
+
+        return client_roles
+
+    def get_clientscope_client_scopemapping_by_id(self, csid, cid, role_id, realm="master"):
+        scopemappings_client_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_CLIENT.format(url=self.baseurl, realm=realm, id=csid,
+                                                                               client_id=cid)
+        try:
+            client_roles = json.loads(
+                to_native(open_url(scopemappings_client_url, method='GET', headers=self.restheaders,
+                                   validate_certs=self.validate_certs).read()))
+
+            for role in client_roles:
+                if role['id'] == role_id:
+                    return role
+
+        except Exception as e:
+            self.module.fail_json(
+                msg='Could not get client scopemapping for clientscope %s in realm %s and client %s: %s'
+                    % (csid, realm, cid, str(e)))
+
+        return None
+
+    def delete_clientscope_client_scopemappings(self, csid, cid, roles, realm="master"):
+        scopemappings_client_url = URL_CLIENTSCOPE_SCOPEMAPPINGS_CLIENT.format(url=self.baseurl, realm=realm, id=csid,
+                                                                               client_id=cid)
+        client_roles = [{"name": x} for x in roles]
+
+        try:
+            return open_url(scopemappings_client_url, method='DELETE', headers=self.restheaders,
+                            data=json.dumps(client_roles), validate_certs=self.validate_certs)
+
+        except Exception as e:
+            self.module.fail_json(
+                msg='Could not delete client scopemappings for clientscope %s in realm %s and client %s: %s'
+                    % (csid, realm, cid, str(e)))
+
     def create_clientsecret(self, id, realm="master"):
         """ Generate a new client secret by id
 
@@ -1432,8 +1617,9 @@ class KeycloakAPI(object):
         clientsecret_url = URL_CLIENTSECRET.format(url=self.baseurl, realm=realm, id=id)
 
         try:
-            return json.loads(to_native(open_url(clientsecret_url, method='POST', headers=self.restheaders, timeout=self.connection_timeout,
-                                                 validate_certs=self.validate_certs).read()))
+            return json.loads(to_native(
+                open_url(clientsecret_url, method='POST', headers=self.restheaders, timeout=self.connection_timeout,
+                         validate_certs=self.validate_certs).read()))
 
         except HTTPError as e:
             if e.code == 404:
@@ -1455,8 +1641,9 @@ class KeycloakAPI(object):
         clientsecret_url = URL_CLIENTSECRET.format(url=self.baseurl, realm=realm, id=id)
 
         try:
-            return json.loads(to_native(open_url(clientsecret_url, method='GET', headers=self.restheaders, timeout=self.connection_timeout,
-                                                 validate_certs=self.validate_certs).read()))
+            return json.loads(to_native(
+                open_url(clientsecret_url, method='GET', headers=self.restheaders, timeout=self.connection_timeout,
+                         validate_certs=self.validate_certs).read()))
 
         except HTTPError as e:
             if e.code == 404:
@@ -1749,6 +1936,20 @@ class KeycloakAPI(object):
         except Exception as e:
             self.module.fail_json(msg='Could not obtain list of roles for realm %s: %s'
                                       % (realm, str(e)))
+
+    def get_realm_role_by_id(self, role_id, realm='master'):
+        """ Fetch a Keycloak role from the provided realm using the role's id.
+        If the role does not exist, None is returned.
+        :param role_id: ID of the realm role
+        :param realm: Realm in which the role resides; default 'master'
+        """
+        roles = self.get_realm_roles(realm)
+
+        for role in roles:
+            if role_id == role['id']:
+                return role
+
+        return None
 
     def get_realm_role(self, name, realm='master'):
         """ Fetch a keycloak role from the provided realm using the role's name.
