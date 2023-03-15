@@ -289,7 +289,7 @@ def main():
     elif gid:
         group_name = kc.get_group_by_groupid(gid, realm=realm)
     elif uid is None and user_name:
-        user_rep = kc.get_user_by_name(user_name, realm=realm)
+        user_rep = kc.get_user_by_username(user_name, realm=realm)
         if user_rep is not None:
             uid = user_rep['id']
         else:
