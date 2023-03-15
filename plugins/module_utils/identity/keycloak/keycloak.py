@@ -560,7 +560,7 @@ class KeycloakAPI(object):
                 return role
         return None
 
-    def get_client_role_id_by_name(self, gid, cid, name, realm="master"):
+    def get_client_role_id_by_name(self, cid, name, realm="master"):
         """ Get the role ID of a client.
 
         :param cid: ID of the client from which to obtain the rolemappings.
